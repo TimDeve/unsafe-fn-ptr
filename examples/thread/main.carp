@@ -1,0 +1,30 @@
+(load "../../unsafe-fn-ptr.carp")
+(system-include "pthread.h")
+(Project.config "cflag" "-pthread")
+
+(register-type Thread "pthread_t")
+(defmodule Thread
+  (deftemplate copy (Fn [(Ref Thread)] Thread) "pthread_t $NAME(pthread_t *ptr)" "$DECL {return *ptr;}")
+  (implements copy Thread.copy)
+  (deftemplate init (Fn [] Thread) "pthread_t $NAME()" "$DECL {pthread_t thread = 0; return thread;}")
+  (register create-c (Fn [(Ref Thread) (Ptr ()) (Ptr ()) (Ptr ())] Int) "pthread_create")
+  (sig create (Fn [(Ref Thread) (Ref (Fn [] ()))] Int))
+  (defn create [thread fun] (create-c thread NULL (Unsafe.fn-ptr fun) (Unsafe.fn-env-ptr fun)))
+  (register exit (Fn [(Ptr ())] ()) "pthread_exit")
+  (register join-c (Fn [Thread (Ptr ())] Int) "pthread_join")
+  (defn join [thread] (join-c thread NULL))
+  (defn join-all [threads] (foreach [thread &threads] (ignore (Thread.join @thread)))))
+
+(use Thread)
+
+(defn main []
+ (let-do [avalue 42
+          threads [(init) (init) (init) (init)]
+          fun (fn []
+                (let-do [rand (Int.random-between 100000 500000)]
+                 (System.sleep-micros @&rand)
+                 (println* (fmt "avalue: %i, rand: %i" avalue rand))))]
+  (Random.seed)
+  (foreach [thread &threads]
+    (ignore (create thread &fun)))
+  (join-all threads)))

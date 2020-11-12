@@ -1,0 +1,23 @@
+(load "../../unsafe-fn-ptr.carp")
+
+(inline-c runner-def "
+typedef void (*fn_def)(void*);
+
+void runner(void* fnvptr, void* args) {
+  fn_def fnptr = (fn_def)fnvptr;
+  fnptr(args);
+}")
+(register runner (Fn [(Ptr ()) (Ptr ())]()))
+
+(defn afunction [] (println* 4))
+
+(defn main []
+ (let [one 1
+       fnone (fn [] (println* @&one))
+       fntwo (fn [] (println* 2))
+       fnthree (fn [int] (println* (+ 1 (Pointer.to-value int))))]
+  (do
+    (runner (Unsafe.fn-ptr &fnone) (Unsafe.fn-env-ptr &fnone))
+    (runner (Unsafe.fn-ptr &fntwo) (Unsafe.fn-env-ptr &fntwo))
+    (runner (Unsafe.fn-ptr &fnthree) (Unsafe.to-void-ptr &2))
+    (runner (Unsafe.fn-ptr &afunction) NULL))))
